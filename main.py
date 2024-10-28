@@ -63,11 +63,11 @@ def delete_product(product_id: int, db: Session = Depends(database.get_db)):
 
 @app.post('/sales/',status_code=status.HTTP_201_CREATED)
 def make_sale(request:schemas.Sale, db: Session = Depends(database.get_db)):
-    product = db.query(models.Products).filter(models.Products.id == request.pid).first()
+    product = db.query(models.Product).filter(models.Product.id == request.pid).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    user = db.query(models.Users).filter(models.Users.id == request.user_id).first()
+    user = db.query(models.User).filter(models.User.id == request.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User  not found")
     
@@ -88,7 +88,7 @@ def make_sale(request:schemas.Sale, db: Session = Depends(database.get_db)):
 
 @app.get("/sales", status_code=status.HTTP_200_OK)
 def fetch_sales(db: Session = Depends(database.get_db)):
-    sales = db.query(models.Sales).join(models.Users).all()
+    sales = db.query(models.Sale).join(models.User).all()
     return [{"id": sale.id, "pid": sale.pid, "user_id": sale.user_id, "first name": sale.users.first_name, "quantity": sale.quantity} for sale in sales]
 
 
@@ -171,6 +171,7 @@ def fetch_user(user_id:int,db:Session=Depends(database.get_db())):
 
 @app.put('/users/{user_id}',status_code=status.HTTP_202_ACCEPTED)
 def update_user_info(request:schemas.User ,db:Session =Depends(database.get_db())):
+
 
 
 @app.post('/login',status_code=status.HTTP_201_CREATED)
