@@ -4,8 +4,13 @@ from werkzeug.security import generate_password_hash,check_password_hash
 import models, database,schemas
 from datetime import datetime,timedelta
 import jwt
+import os
 
 app = FastAPI()
+
+secret_key = os.getenv("SECRET_KEY")
+print(secret_key)
+
 
 models.Base.metadata.create_all(database.engine)
 
@@ -89,20 +94,20 @@ def make_sale(request:schemas.Sale, db: Session = Depends(database.get_db)):
 @app.get("/sales", status_code=status.HTTP_200_OK)
 def fetch_sales(db: Session = Depends(database.get_db)):
     sales = db.query(models.Sale).join(models.User).all()
-    return [{"id": sale.id, "pid": sale.pid, "user_id": sale.user_id, "first name": sale.users.first_name, "quantity": sale.quantity} for sale in sales]
+    return [{"id": sale.id, "pid": sale.pid, "user_id": sale.user_id, "first name": sale.user.first_name, "quantity": sale.quantity} for sale in sales]
 
 
 @app.get("/sales/{id}", status_code=status.HTTP_200_OK)
 def fetch_sale(id: int, db: Session = Depends(database.get_db)):
     sale = (
-        db.query(models.Sales).join(models.Users).join(models.Products).filter(models.Sales.id == id).first()
+        db.query(models.Sale).join(models.User).join(models.Product).filter(models.Sale.id == id).first()
     )
     if sale:
         return {
             "id": sale.id,
             "pid": sale.pid,
-            "user_id": sale.users.id, 
-            "product_name": sale.products.name,
+            "user_id": sale.user.id, 
+            "product_name": sale.product.name,
             "quantity": sale.quantity
         }
     raise HTTPException(status_code=404, detail="Sale not found")
@@ -110,11 +115,11 @@ def fetch_sale(id: int, db: Session = Depends(database.get_db)):
 @app.put("/sales/{id}", status_code=status.HTTP_202_ACCEPTED)
 def update_sale(id: int, request: schemas.Sale, db: Session = Depends(database.get_db)):
     
-    sale = db.query(models.Sales).filter(models.Sales.id == id).first()
+    sale = db.query(models.Sale).filter(models.Sale.id == id).first()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
 
-    product = db.query(models.Products).filter(models.Products.id == sale.pid).first()
+    product = db.query(models.Product).filter(models.Product.id == sale.pid).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -138,7 +143,7 @@ def fetch_sales_by_user(user_id: int, db: Session = Depends(database.get_db)):
         "id": sale.id,
         "pid": sale.pid,
         "user_id": sale.user_id,
-        "first_name": sale.users.first_name,
+        "first_name": sale.user.first_name,
         "quantity": sale.quantity
     } for sale in sales]
 
@@ -157,27 +162,57 @@ def register_user(user: schemas.User, db: Session = Depends(database.get_db)):
     db.refresh(new_user)
     return{"message":"User created successfully"}  
 
-@app.get('/users',status_code=status.HTTP_200_OK)
-def get_users(db:Session =Depends(database.get_db())):
-    users = db.query(models.User).all()
-    user = [{"user_id":user.id,"first_name":user.first_name,
-             "last_name":user.last_name,"email":user.email,"phone_number":user.phone_number} for user in users]
-    return {"users":user}
+@app.get('/users', status_code=status.HTTP_200_OK)
+def get_users(db: Session = Depends(database.get_db)):
+    try:
+        users = db.query(models.User).all()
+        user_list = [
+            {
+                "user_id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "phone_number": user.phone_number
+            } 
+            for user in users
+        ]
+        return {"users": user_list}
+    except Exception as e:  
+        raise HTTPException(status_code=500, detail=str(e) or "Error fetching users")
 
 @app.get('/users/{user_id}')
-def fetch_user(user_id:int,db:Session=Depends(database.get_db())):
+def fetch_user(user_id:int,db:Session=Depends(database.get_db)):
     user = db.query(models.User).filter(models.User.id==user_id).first()
     return user
 
 @app.put('/users/{user_id}',status_code=status.HTTP_202_ACCEPTED)
-def update_user_info(request:schemas.User ,db:Session =Depends(database.get_db())):
+def update_user_info(request:schemas.User ,db:Session =Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.email==request.email).first()
+    if user is None:
+        raise HTTPException(status_code=404,detail="User not found")
+    user.first_name = request.first_name
+    user.last_name = request.last_name
+    user.email = request.email
+    user.phone_number = request.phone_number
+    user.password = request.password
+    db.commit()
+    db.refresh(user)
+
+@app.delete('/users/{user_id}',status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id:int,db:Session=Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id==user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404,detail='User not found')
+    db.delete(user)
+    db.commit()
+    return {"message":"User deleted successfully"}
 
 
 
 @app.post('/login',status_code=status.HTTP_201_CREATED)
-def login_user(user:schemas.User,db:Session=Depends(database.get_db())):
+def login_user(user:schemas.User,db:Session=Depends(database.get_db)):
     registered_user = db.query(models.User).filter(models.User.email==user.email).first()
-    if not registered_user:
+    if registered_user is None:
         raise HTTPException(status_code=404,detail="User does nor exist,please register")
     try:
         if check_password_hash(registered_user.password,user.password):
