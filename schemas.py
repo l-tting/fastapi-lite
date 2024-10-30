@@ -8,7 +8,7 @@ class Product(BaseModel):
 
 class Sale(BaseModel):
     pid: int
-    user_id:int
+    
     quantity: int
 
 class User(BaseModel):
@@ -16,5 +16,9 @@ class User(BaseModel):
     last_name:str
     email:str
     phone_number:str
+    password:str
+
+class UserLogin(BaseModel):
+    email:str
     password:str
 

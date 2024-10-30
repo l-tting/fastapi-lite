@@ -19,7 +19,7 @@ class User(Base):
     last_name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     phone_number = Column(String, nullable=False)
-    password = Column(String(100),nullable=False)
+    password = Column(String,nullable=False)
     sales = relationship("Sale", back_populates='user')
 
 class Sale(Base):
