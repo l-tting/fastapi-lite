@@ -73,14 +73,14 @@ def make_sale(request:schemas.Sale,user=Depends(get_current_user), db: Session =
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    user = db.query(models.User).filter(models.User.id == request.user_id).first()
+    user = db.query(models.User).filter(models.User.id == user.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User  not found")
     
     if product.stock_quantity < request.quantity:
         raise HTTPException(status_code=400, detail="Not enough stock available")
     
-    new_sale = models.Sale(pid=request.pid, user_id=request.user_id, quantity=request.quantity)
+    new_sale = models.Sale(pid=request.pid, user_id=user.id, quantity=request.quantity)
     product.stock_quantity -= request.quantity
 
     db.add(new_sale)
@@ -135,7 +135,7 @@ def update_sale(id: int, request: schemas.Sale,user=Depends(get_current_user), d
 
 @app.get("/sales/user/{user_id}", status_code=status.HTTP_200_OK)
 def fetch_sales_by_user(user_id: int, db: Session = Depends(database.get_db)):
-    sales = db.query(models.Sale).filter(models.Sales.user_id == user_id).join(models.Users).all()
+    sales = db.query(models.Sale).filter(models.Sale.user_id == user_id).join(models.Users).all()
     
     if not sales:
         raise HTTPException(status_code=404, detail="No sales found for this user")
