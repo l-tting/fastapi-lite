@@ -18,3 +18,7 @@ class User(BaseModel):
     phone_number:str
     password:str
 
+class UserLogin(BaseModel):
+    email:str
+    password:str
+
