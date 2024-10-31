@@ -4,20 +4,29 @@ from werkzeug.security import generate_password_hash,check_password_hash
 import models, database,schemas
 from datetime import datetime,timedelta
 from auth import get_current_user,create_token
+from fastapi.middleware.cors import CORSMiddleware
 import jwt
 import os
 
 app = FastAPI()
 
-secret_key = os.getenv("SECRET_KEY")
-print(secret_key)
+# secret_key = os.getenv("SECRET_KEY")
+# print(secret_key)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 models.Base.metadata.create_all(database.engine)
 
 @app.get('/')
 def index():
-    return {"message":"Hello world"}
+    return {"message":"MyDuka FASTAPI"}
 
 
 @app.post('/products',status_code=status.HTTP_201_CREATED)
@@ -30,9 +39,9 @@ def add_product(request:schemas.Product,user=Depends(get_current_user),db:Sessio
 
 
 @app.get('/products',status_code=status.HTTP_200_OK)
-def fetch_products(user=Depends(get_current_user),db:Session=Depends(database.get_db)):
+def fetch_products(db:Session=Depends(database.get_db)):
     products = db.query(models.Product).all()
-    return products
+    return {"products":products}
           
 
 @app.get('/products/{product_id}', status_code=status.HTTP_200_OK)
@@ -67,7 +76,7 @@ def delete_product(product_id: int, user=Depends(get_current_user),db: Session =
     return {"message": "Product deleted successfully"}
 
 
-@app.post('/sales/',status_code=status.HTTP_201_CREATED)
+@app.post('/sales',status_code=status.HTTP_201_CREATED)
 def make_sale(request:schemas.Sale,user=Depends(get_current_user), db: Session = Depends(database.get_db)):
     product = db.query(models.Product).filter(models.Product.id == request.pid).first()
     if not product:
@@ -95,11 +104,11 @@ def make_sale(request:schemas.Sale,user=Depends(get_current_user), db: Session =
 @app.get("/sales", status_code=status.HTTP_200_OK)
 def fetch_sales(user=Depends(get_current_user),db: Session = Depends(database.get_db)):
     sales = db.query(models.Sale).join(models.User).all()
-    return [{"id": sale.id, "pid": sale.pid, "user_id": sale.user_id, "first name": sale.user.first_name, "quantity": sale.quantity} for sale in sales]
+    return [{"id": sale.id, "pid": sale.pid, "user_id": user.id, "first name": sale.user.first_name, "quantity": sale.quantity} for sale in sales]
 
 
 @app.get("/sales/{id}", status_code=status.HTTP_200_OK)
-def fetch_sale(id: int, db: Session = Depends(database.get_db)):
+def fetch_sale(id: int,user=Depends(get_current_user), db: Session = Depends(database.get_db)):
     sale = (
         db.query(models.Sale).join(models.User).join(models.Product).filter(models.Sale.id == id).first()
     )
@@ -107,7 +116,7 @@ def fetch_sale(id: int, db: Session = Depends(database.get_db)):
         return {
             "id": sale.id,
             "pid": sale.pid,
-            "user_id": sale.user.id, 
+            "user_id": user.id, 
             "product_name": sale.product.name,
             "quantity": sale.quantity
         }
@@ -156,7 +165,7 @@ def register_user(user: schemas.User, db: Session = Depends(database.get_db)):
     hashed_password = generate_password_hash(user.password)
     new_user = models.User(
         first_name=user.first_name,last_name=user.last_name,
-        email=user.email,phone_number=user.password,password=hashed_password)
+        email=user.email,phone_number=user.phone_number,password=hashed_password)
    
     db.add(new_user)
     db.commit()
@@ -181,23 +190,42 @@ def get_users(db: Session = Depends(database.get_db)):
     except Exception as e:  
         raise HTTPException(status_code=500, detail=str(e) or "Error fetching users")
 
-@app.get('/users/{user_id}')
+@app.get('/users/{user_id}',status_code=status.HTTP_200_OK)
 def fetch_user(user_id:int,db:Session=Depends(database.get_db)):
     user = db.query(models.User).filter(models.User.id==user_id).first()
     return user
 
+@app.get('/users/email/{email}', status_code=status.HTTP_200_OK)
+def fetch_user_by_email(email: str, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "phone_number": user.phone_number
+    }
+
 @app.put('/users/{user_id}',status_code=status.HTTP_202_ACCEPTED)
-def update_user_info(request:schemas.User ,db:Session =Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.email==request.email).first()
+def update_user_info(request:schemas.User,current_user=Depends(get_current_user) ,db:Session =Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.email==current_user.email).first()
+    print(user.email)
     if user is None:
         raise HTTPException(status_code=404,detail="User not found")
     user.first_name = request.first_name
     user.last_name = request.last_name
     user.email = request.email
     user.phone_number = request.phone_number
-    user.password = request.password
-    db.commit()
-    db.refresh(user)
+    user.password = generate_password_hash(request.password)
+    try:
+        db.commit()
+        db.refresh(user)
+        return {"message":"updated user info successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500,detail=f"Error updating user info...{e}")
+
 
 @app.delete('/users/{user_id}',status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id:int,db:Session=Depends(database.get_db)):
@@ -207,6 +235,8 @@ def delete_user(user_id:int,db:Session=Depends(database.get_db)):
     db.delete(user)
     db.commit()
     return {"message":"User deleted successfully"}
+
+
 
 
 
