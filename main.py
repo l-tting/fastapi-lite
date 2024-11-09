@@ -30,7 +30,7 @@ def index():
 
 
 @app.post('/products',status_code=status.HTTP_201_CREATED)
-def add_product(request:schemas.Product,user=Depends(get_current_user),db:Session=Depends(database.get_db)):
+def add_product(request:schemas.Product,db:Session=Depends(database.get_db)):
     new_product = models.Product(name=request.name,buying_price=request.buying_price,selling_price=request.selling_price,stock_quantity=request.stock_quantity)
     db.add(new_product)
     db.commit()
@@ -144,7 +144,7 @@ def update_sale(id: int, request: schemas.Sale,user=Depends(get_current_user), d
 
 @app.get("/sales/user/{user_id}", status_code=status.HTTP_200_OK)
 def fetch_sales_by_user(user_id: int, db: Session = Depends(database.get_db)):
-    sales = db.query(models.Sale).filter(models.Sale.user_id == user_id).join(models.Users).all()
+    sales = db.query(models.Sale).filter(models.Sale.user_id == user_id).join(models.User).all()
     
     if not sales:
         raise HTTPException(status_code=404, detail="No sales found for this user")
@@ -161,6 +161,7 @@ def fetch_sales_by_user(user_id: int, db: Session = Depends(database.get_db)):
 def register_user(user: schemas.User, db: Session = Depends(database.get_db)):
     existing_user = db.query(models.User).filter(models.User.email==user.email).first()
     if existing_user:
+        print(existing_user.email)
         raise HTTPException(status_code=400, detail="User already exists,please login")
     hashed_password = generate_password_hash(user.password)
     new_user = models.User(
@@ -208,9 +209,10 @@ def fetch_user_by_email(email: str, db: Session = Depends(database.get_db)):
         "phone_number": user.phone_number
     }
 
-@app.put('/users/{user_id}',status_code=status.HTTP_202_ACCEPTED)
+@app.put('/users/',status_code=status.HTTP_202_ACCEPTED)
 def update_user_info(request:schemas.User,current_user=Depends(get_current_user) ,db:Session =Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.email==current_user.email).first()
+    user = db.query(models.User).filter(models.User.id==current_user.id).first()
+    print("User",user)
     print(user.email)
     if user is None:
         raise HTTPException(status_code=404,detail="User not found")
@@ -252,10 +254,12 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
             return {"access_token":token}
     except Exception as e:
         raise HTTPException(status_code=500,detail=f"Error creating token: {e}")
+    
+# @app.post("/refresh")
+# def refresh_token():
+
 
     
-
-
 
 
 
