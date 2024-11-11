@@ -25,7 +25,7 @@ def create_token(data:dict,expries_delta:timedelta | None=None):
     if expries_delta:
         expires = datetime.now(timezone.utc) + expries_delta
     else:
-        expires = datetime.now(timezone.utc) + expries_delta(minutes=30)
+        expires = datetime.now(timezone.utc) + expries_delta(seconds=30)
     to_encode.update({"exp":expires})
     encoded_jwt = jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
 

@@ -1,12 +1,14 @@
-from fastapi import FastAPI,Depends,status,HTTPException
+from fastapi import FastAPI,Depends,status,HTTPException,BackgroundTasks
 from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash,check_password_hash
 import models, database,schemas
 from datetime import datetime,timedelta
 from auth import get_current_user,create_token
 from fastapi.middleware.cors import CORSMiddleware
+from services import sales_per_day,profit_per_day,profit_per_product,sales_per_product
 import jwt
 import os
+import time
 
 app = FastAPI()
 
@@ -39,7 +41,7 @@ def add_product(request:schemas.Product,db:Session=Depends(database.get_db)):
 
 
 @app.get('/products',status_code=status.HTTP_200_OK)
-def fetch_products(db:Session=Depends(database.get_db)):
+def fetch_products(user=Depends(get_current_user),db:Session=Depends(database.get_db)):
     products = db.query(models.Product).all()
     return {"products":products}
           
@@ -104,7 +106,7 @@ def make_sale(request:schemas.Sale,user=Depends(get_current_user), db: Session =
 @app.get("/sales", status_code=status.HTTP_200_OK)
 def fetch_sales(user=Depends(get_current_user),db: Session = Depends(database.get_db)):
     sales = db.query(models.Sale).join(models.User).all()
-    return [{"id": sale.id, "pid": sale.pid, "user_id": user.id, "first name": sale.user.first_name, "quantity": sale.quantity} for sale in sales]
+    return {"sales_data":sales}
 
 
 @app.get("/sales/{id}", status_code=status.HTTP_200_OK)
@@ -158,7 +160,8 @@ def fetch_sales_by_user(user_id: int, db: Session = Depends(database.get_db)):
     } for sale in sales]
 
 @app.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
-def register_user(user: schemas.User, db: Session = Depends(database.get_db)):
+def register_user(user: schemas.User,bg_task:BackgroundTasks, db: Session = Depends(database.get_db)):
+    start_time = time.time()
     existing_user = db.query(models.User).filter(models.User.email==user.email).first()
     if existing_user:
         print(existing_user.email)
@@ -171,6 +174,8 @@ def register_user(user: schemas.User, db: Session = Depends(database.get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    process_time = time.time() - start_time
+    print(f"Prrocess took {process_time}")
     return{"message":"User created successfully"}  
 
 @app.get('/users', status_code=status.HTTP_200_OK)
@@ -249,7 +254,7 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
         raise HTTPException(status_code=404,detail="User does nor exist,please register")
     try:
         if check_password_hash(registered_user.password,user.password):
-            # access_token = jwt.encode({"sub":registered_user.email,"exp":datetime.utcnow()+timedelta(minutes=10)},algorithm='HS256')
+
             token = create_token(data={"user":user.email},expries_delta=timedelta(minutes=30))
             return {"access_token":token}
     except Exception as e:
@@ -258,6 +263,31 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
 # @app.post("/refresh")
 # def refresh_token():
 
+
+@app.get("/dashboard/sales_per_day")
+def sales_day(db: Session = Depends(database.get_db)):
+    sales_data = sales_per_day(db)
+    return {"sales_per_day":sales_data}
+
+@app.get("/dashboard/profit_per_day")
+def profit_day(db:Session=Depends(database.get_db)):
+    profit_data = profit_per_day(db)
+    return {"Profit_per_day":profit_data}
+
+@app.get("/dashboard/profit_per_product")
+def profit_prod(db:Session=Depends(database.get_db)):
+    prof_prod = profit_per_product(db)
+    return {"profit per product":prof_prod}
+
+@app.get("/dashboard/sales_per_product")
+def sales_product(db:Session=Depends(database.get_db)):
+    sales_prod =sales_per_product(db)
+    return {"sales per product":sales_prod}
+
+
+
+
+ 
 
     
 
