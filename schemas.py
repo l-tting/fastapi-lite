@@ -8,7 +8,6 @@ class Product(BaseModel):
 
 class Sale(BaseModel):
     pid: int
-    
     quantity: int
 
 class User(BaseModel):
