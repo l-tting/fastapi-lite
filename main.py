@@ -5,7 +5,7 @@ import models, database,schemas
 from datetime import datetime,timedelta
 from auth import get_current_user,create_token
 from fastapi.middleware.cors import CORSMiddleware
-from services import sales_per_day,profit_per_day,profit_per_product,sales_per_product
+from services import sales_per_day,profit_per_day,profit_per_product,sales_per_product,get_no_of_products,get_sales_today,get_no_of_users,get_profit_today
 import jwt
 import os
 import time
@@ -32,7 +32,7 @@ def index():
 
 
 @app.post('/products',status_code=status.HTTP_201_CREATED)
-def add_product(request:schemas.Product,db:Session=Depends(database.get_db)):
+def add_product(request:schemas.Product,user=Depends(get_current_user),db:Session=Depends(database.get_db)):
     new_product = models.Product(name=request.name,buying_price=request.buying_price,selling_price=request.selling_price,stock_quantity=request.stock_quantity)
     db.add(new_product)
     db.commit()
@@ -55,16 +55,24 @@ def fetch_one_product(product_id: int,user=Depends(get_current_user), db: Sessio
 
 
 @app.put('/products/{product_id}',status_code=status.HTTP_200_OK)
-def update_product(product_id : int,request: schemas.Product,user=Depends(get_current_user),db: Session = Depends(database.get_db)):
+def update_product(product_id : int,request: schemas.Product_Update,user=Depends(get_current_user),response_model=models.Product,db: Session = Depends(database.get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    product.name = request.name
-    product.buying_price = request.buying_price
-    product.selling_price = request.selling_price
-    product.stock_quantity = request.stock_quantity
-    db.commit()
-    db.refresh(product)
+    if request.name is not None:
+        product.name = request.name
+    if request.buying_price is not None:
+        product.buying_price = request.buying_price
+    if request.selling_price is not None:
+        product.selling_price = request.selling_price
+    if request.stock_quantity is not None:
+        product.stock_quantity = request.stock_quantity
+    try:
+        db.commit()
+        db.refresh(product)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update product. Please try again later.")
     return {"message": "Product updated successfully", "product": product}
 
 
@@ -272,17 +280,27 @@ def sales_day(db: Session = Depends(database.get_db)):
 @app.get("/dashboard/profit_per_day")
 def profit_day(db:Session=Depends(database.get_db)):
     profit_data = profit_per_day(db)
-    return {"Profit_per_day":profit_data}
+    return {"profit_per_day":profit_data}
 
 @app.get("/dashboard/profit_per_product")
 def profit_prod(db:Session=Depends(database.get_db)):
     prof_prod = profit_per_product(db)
-    return {"profit per product":prof_prod}
+    return {"profit_per_product":prof_prod}
 
 @app.get("/dashboard/sales_per_product")
 def sales_product(db:Session=Depends(database.get_db)):
     sales_prod =sales_per_product(db)
-    return {"sales per product":sales_prod}
+    return {"sales_per_product":sales_prod}
+
+@app.get("/dashboard/quick_stats")
+def product_number(db:Session=Depends(database.get_db)):
+    number_of_products = get_no_of_products(db)
+    no_of_users = get_no_of_users(db)
+    sales_today = get_sales_today(db)
+    profit_today = get_profit_today(db)
+    return {"number_prods":number_of_products,"no_of_users":no_of_users,"sales_today":sales_today,"profit_today":profit_today}
+
+
 
 
 
