@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
-from models import Sale,Product
+from models import Sale,Product,User
 
 
 def sales_per_day(db:Session):
@@ -30,3 +30,19 @@ def profit_per_product(db:Session):
     
     profit_p =[{"product":product,"profit":profit} for product,profit in profit_product]
     return profit_p
+
+def get_no_of_products(db:Session):
+    products = db.query(Product).all()
+    return len(products)
+
+def get_no_of_users(db:Session):
+    users = db.query(User).all()
+    return len(users)
+
+def get_sales_today(db:Session):
+    sales_today = db.query(func.sum(Sale.quantity * Product.selling_price)).join(Product).filter(func.date(Sale.created_at)==date.today()).scalar()
+    return sales_today
+
+def get_profit_today(db:Session):
+    profit_today = db.query(func.sum((Sale.quantity*(Product.selling_price - Product.buying_price)))).join(Product).filter(func.date(Sale.created_at)==date.today()).scalar()
+    return profit_today

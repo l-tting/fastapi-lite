@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class Product(BaseModel):
     name:str
@@ -20,4 +21,10 @@ class User(BaseModel):
 class UserLogin(BaseModel):
     email:str
     password:str
+
+class Product_Update(BaseModel):
+    name: Optional[str] = None
+    buying_price: Optional[float] = None
+    selling_price: Optional[float] = None
+    stock_quantity: Optional[int] = None
 
