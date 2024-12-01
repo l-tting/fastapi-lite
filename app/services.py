@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
-from models import Sale,Product,User
+from .models import Sale,Product,User
 
 
 def sales_per_day(db:Session):
@@ -46,3 +46,8 @@ def get_sales_today(db:Session):
 def get_profit_today(db:Session):
     profit_today = db.query(func.sum((Sale.quantity*(Product.selling_price - Product.buying_price)))).join(Product).filter(func.date(Sale.created_at)==date.today()).scalar()
     return profit_today
+
+def get_depleting_products(db:Session):
+    products = db.query(Product).filter(Product.stock_quantity < 20).all()
+    # data = [lowstock for lowstock in products]
+    return products

@@ -1,11 +1,17 @@
-from fastapi import FastAPI,Depends,status,HTTPException,BackgroundTasks
+from fastapi import FastAPI,Depends,status,HTTPException,BackgroundTasks,Request
 from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash,check_password_hash
-import models, database,schemas
+from fastapi.responses import JSONResponse
+# import models, database,schemas
+from . import models
+from app import database
+from app import schemas
 from datetime import datetime,timedelta
-from auth import get_current_user,create_token
+# absolute import
+from app.auth import get_current_user,create_access_token,create_refresh_token,get_refresh_token,verify_refresh_token
 from fastapi.middleware.cors import CORSMiddleware
-from services import sales_per_day,profit_per_day,profit_per_product,sales_per_product,get_no_of_products,get_sales_today,get_no_of_users,get_profit_today
+# relative import
+from .services import sales_per_day,profit_per_day,profit_per_product,sales_per_product,get_no_of_products,get_sales_today,get_no_of_users,get_profit_today,get_depleting_products
 import jwt
 import os
 import time
@@ -57,8 +63,10 @@ def fetch_one_product(product_id: int,user=Depends(get_current_user), db: Sessio
 @app.put('/products/{product_id}',status_code=status.HTTP_200_OK)
 def update_product(product_id : int,request: schemas.Product_Update,user=Depends(get_current_user),response_model=models.Product,db: Session = Depends(database.get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
+
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
+
     if request.name is not None:
         product.name = request.name
     if request.buying_price is not None:
@@ -74,6 +82,8 @@ def update_product(product_id : int,request: schemas.Product_Update,user=Depends
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update product. Please try again later.")
     return {"message": "Product updated successfully", "product": product}
+
+    
 
 
 @app.delete('/products/{product_id}', status_code=status.HTTP_204_NO_CONTENT)
@@ -263,13 +273,38 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
     try:
         if check_password_hash(registered_user.password,user.password):
 
-            token = create_token(data={"user":user.email},expries_delta=timedelta(minutes=30))
-            return {"access_token":token}
+            access_token = create_access_token(data={"user":user.email},expries_delta=timedelta(seconds=60))
+            refresh_token = create_refresh_token(data={"user":user.email},expires_delta=timedelta(days=1))
+            response = JSONResponse(content={"message":"Login successfull"})
+            response.set_cookie(
+                key="access_token",
+                value= access_token,
+                httponly=True,
+                # secure ensures cookies are sent only over secure(encrypted) https connections rather than unencrypted http connections
+                # set to false in development since test with localhost isnt https
+                secure=False,
+                # max age default in secs
+                max_age=3600,  
+                expires=timedelta(minutes=30)
+
+            )
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                secure=False,
+                 max_age=3600, # relative expiration - overrides expires
+                expires=timedelta(hours=1) # absolute exp- can be set to expire at an exact point or date in http date format
+            )
+            return response
     except Exception as e:
         raise HTTPException(status_code=500,detail=f"Error creating token: {e}")
     
-# @app.post("/refresh")
-# def refresh_token():
+# @app.post("/refresh",status_code=status.HTTP_200_OK)
+# def refresh_token(request:Request,db:Session=Depends(database.get_db)):
+   
+
+
 
 
 @app.get("/dashboard/sales_per_day")
@@ -301,6 +336,13 @@ def product_number(db:Session=Depends(database.get_db)):
     return {"number_prods":number_of_products,"no_of_users":no_of_users,"sales_today":sales_today,"profit_today":profit_today}
 
 
+
+@app.get("/depleted",status_code=status.HTTP_200_OK)
+def depleted_stock(user=Depends(get_current_user),db:Session=Depends(database.get_db)):
+    depleting_products =  get_depleting_products(db)
+
+    return {"depleting":depleting_products}
+   
 
 
 
