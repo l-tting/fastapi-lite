@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date
 from .models import Sale,Product,User
+# from models import Sale,Product,User
 
 
 def sales_per_day(db:Session):

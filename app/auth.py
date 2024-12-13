@@ -1,5 +1,7 @@
 from passlib.context import CryptContext
 from .models import User
+# from models import User
+# from database import sessionlocal
 from .database import sessionlocal
 from fastapi import Depends,HTTPException,Request
 from datetime import datetime,timedelta,timezone
@@ -42,14 +44,14 @@ def create_refresh_token(data:dict,expires_delta:timedelta | None=None):
     return encoded_jwt
         
 
-# def get_token_auth_heaaders(credentials:HTTPAuthorizationCredentials=Depends(HTTPBearer())):
-#     if credentials.scheme != "Bearer":
-#         raise HTTPException(status_code=403,detail="Invalid authentication scheme")
+def get_token_auth_heaaders(credentials:HTTPAuthorizationCredentials=Depends(HTTPBearer())):
+    if credentials.scheme != "Bearer":
+        raise HTTPException(status_code=403,detail="Invalid authentication scheme")
     
-#     return credentials.credentials
+    return credentials.credentials
 
 # -> str specifies return type of the func
-#func call in every request to ensure cookie is present
+# func call in every request to ensure cookie is present
 def get_token_from_cookie(request: Request) -> str:
     token = request.cookies.get("access_token")  # Extract token from cookies
     if not token:
@@ -63,7 +65,7 @@ def get_refresh_token(request:Request) ->str:
     return token
 
 #Depends-means the dependency is executed first before handler
-async def get_current_user(access_token: str = Depends(get_token_from_cookie)):
+async def get_current_user(access_token: str = Depends(get_token_auth_heaaders)):
     try:
     # ALGORITHM passed in a list coz jwt.decode() can accept a list of algos for verification
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
