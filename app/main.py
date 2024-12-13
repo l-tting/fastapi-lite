@@ -8,9 +8,11 @@ from app import database
 from app import schemas
 from datetime import datetime,timedelta
 # absolute import
+# from auth import get_current_user,create_access_token,create_refresh_token,get_refresh_token,verify_refresh_token
 from app.auth import get_current_user,create_access_token,create_refresh_token,get_refresh_token,verify_refresh_token
 from fastapi.middleware.cors import CORSMiddleware
 # relative import
+# from services import sales_per_day,profit_per_day,profit_per_product,sales_per_product,get_no_of_products,get_sales_today,get_no_of_users,get_profit_today,get_depleting_products
 from .services import sales_per_day,profit_per_day,profit_per_product,sales_per_product,get_no_of_products,get_sales_today,get_no_of_users,get_profit_today,get_depleting_products
 import jwt
 import os
@@ -265,7 +267,7 @@ def delete_user(user_id:int,db:Session=Depends(database.get_db)):
 
 
 
-@app.post('/login',status_code=status.HTTP_201_CREATED)
+@app.post('/login',status_code=status.HTTP_200_OK)
 def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
     registered_user = db.query(models.User).filter(models.User.email==user.email).first()
     if registered_user is None:
@@ -273,30 +275,33 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
     try:
         if check_password_hash(registered_user.password,user.password):
 
-            access_token = create_access_token(data={"user":user.email},expries_delta=timedelta(seconds=60))
+            access_token = create_access_token(data={"user":user.email},expries_delta=timedelta(seconds=3600))
             refresh_token = create_refresh_token(data={"user":user.email},expires_delta=timedelta(days=1))
             response = JSONResponse(content={"message":"Login successfull"})
             response.set_cookie(
                 key="access_token",
                 value= access_token,
-                httponly=True,
+                httponly=False,
                 # secure ensures cookies are sent only over secure(encrypted) https connections rather than unencrypted http connections
                 # set to false in development since test with localhost isnt https
                 secure=False,
+
                 # max age default in secs
                 max_age=3600,  
-                expires=timedelta(minutes=30)
+                # expires=timedelta(minutes=30)
+
 
             )
             response.set_cookie(
                 key="refresh_token",
                 value=refresh_token,
-                httponly=True,
+                httponly=False,
                 secure=False,
-                 max_age=3600, # relative expiration - overrides expires
-                expires=timedelta(hours=1) # absolute exp- can be set to expire at an exact point or date in http date format
+
+                max_age=3600, # relative expiration - overrides expires
+                # expires=timedelta(hours=1) # absolute exp- can be set to expire at an exact point or date in http date format
             )
-            return response
+            return {"access_token":access_token}
     except Exception as e:
         raise HTTPException(status_code=500,detail=f"Error creating token: {e}")
     
