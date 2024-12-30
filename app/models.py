@@ -10,7 +10,6 @@ class Product(Base):
     buying_price = Column(Integer, nullable=False)
     selling_price = Column(Integer, nullable=False)
     stock_quantity = Column(Integer, nullable=False)
-
     sales = relationship("Sale", back_populates='product')
 
 class User(Base):
@@ -30,10 +29,9 @@ class Sale(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     quantity = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=func.now())
-    
-
     product = relationship("Product", back_populates='sales')
     user = relationship("User", back_populates='sales')
     
+
 
 

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from werkzeug.security import generate_password_hash,check_password_hash
 from fastapi.responses import JSONResponse
 # import models, database,schemas
-from . import models
+from app import models
 from app import database
 from app import schemas
 from datetime import datetime,timedelta
@@ -276,31 +276,31 @@ def login_user(user:schemas.UserLogin,db:Session=Depends(database.get_db)):
         if check_password_hash(registered_user.password,user.password):
 
             access_token = create_access_token(data={"user":user.email},expries_delta=timedelta(seconds=3600))
-            refresh_token = create_refresh_token(data={"user":user.email},expires_delta=timedelta(days=1))
-            response = JSONResponse(content={"message":"Login successfull"})
-            response.set_cookie(
-                key="access_token",
-                value= access_token,
-                httponly=False,
-                # secure ensures cookies are sent only over secure(encrypted) https connections rather than unencrypted http connections
-                # set to false in development since test with localhost isnt https
-                secure=False,
+            # refresh_token = create_refresh_token(data={"user":user.email},expires_delta=timedelta(days=1))
+            # response = JSONResponse(content={"message":"Login successfull"})
+            # response.set_cookie(
+            #     key="access_token",
+            #     value= access_token,
+            #     httponly=False,
+            #     # secure ensures cookies are sent only over secure(encrypted) https connections rather than unencrypted http connections
+            #     # set to false in development since test with localhost isnt https
+            #     secure=False,
 
-                # max age default in secs
-                max_age=3600,  
-                # expires=timedelta(minutes=30)
+            #     # max age default in secs
+            #     max_age=3600,  
+            #     # expires=timedelta(minutes=30)
 
 
-            )
-            response.set_cookie(
-                key="refresh_token",
-                value=refresh_token,
-                httponly=False,
-                secure=False,
+            # )
+            # response.set_cookie(
+            #     key="refresh_token",
+            #     value=refresh_token,
+            #     httponly=False,
+            #     secure=False,
 
-                max_age=3600, # relative expiration - overrides expires
-                # expires=timedelta(hours=1) # absolute exp- can be set to expire at an exact point or date in http date format
-            )
+            #     max_age=3600, # relative expiration - overrides expires
+            #     # expires=timedelta(hours=1) # absolute exp- can be set to expire at an exact point or date in http date format
+            # )
             return {"access_token":access_token}
     except Exception as e:
         raise HTTPException(status_code=500,detail=f"Error creating token: {e}")

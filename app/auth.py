@@ -43,7 +43,7 @@ def create_refresh_token(data:dict,expires_delta:timedelta | None=None):
     encoded_jwt = jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
     return encoded_jwt
         
-
+#retrieve and validate Authentication Bearer token
 def get_token_auth_heaaders(credentials:HTTPAuthorizationCredentials=Depends(HTTPBearer())):
     if credentials.scheme != "Bearer":
         raise HTTPException(status_code=403,detail="Invalid authentication scheme")
